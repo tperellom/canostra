@@ -242,9 +242,6 @@
             
             initializeSortable();
         }
-            
-            initializeSortable();
-        }
         
         function renderRoomTags(room) {
             const tagsHTML = (room.tags || []).map(tag => `<span class="tag text-sm font-medium mr-2 mb-2 inline-block px-3 py-1 rounded-full">${tag}</span>`).join('');
@@ -464,7 +461,7 @@
                 
                 if (Object.keys(updateData).length > 0) {
                     await updateDoc(ideaDocRef, updateData);
-                    // ⭐ AQUEST ÉS EL CANVI CLAU: Actualitza la UI immediatament
+                    // Actualitza la UI immediatament
                     element.innerHTML = newContentHTML;
                 } else {
                     // Si no hi ha dades vàlides (ex: text buit), restaura l'estat original
