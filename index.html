@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
+    <title>Llista d'Idees per a la Casa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +15,8 @@
         .action-buttons { opacity: 0; transition: opacity 0.2s ease-in-out; }
         .tag { background-color: #e0e7ff; color: #4338ca; }
         .highlight { background-color: #fef9c3; }
+        /* Estils per al modal de confirmació */
+        #confirmation-modal { transition: opacity 0.3s ease; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -43,7 +45,7 @@
                 </div>
             </div>
             <div class="mt-6 relative">
-                 <input type="text" id="search-bar" placeholder="Cerca per etiqueta (ex: tag: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 <input type="text" id="search-bar" placeholder="Cerca per text o etiqueta (ex: tag: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                  <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
         </header>
@@ -61,6 +63,18 @@
         <div id="loading-message" class="text-center text-gray-500 mt-10">Carregant dades...</div>
     </div>
 
+    <!-- Modal de Confirmació d'Esborrat -->
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 id="modal-title" class="text-lg font-bold text-gray-900">Confirmar acció</h3>
+            <p id="modal-message" class="mt-2 text-sm text-gray-600">Estàs segur que vols continuar?</p>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel·lar</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Esborrar</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         const firebaseConfig = {
           apiKey: "AIzaSyDjMJi26sdZIOt1c9b7JOl1i7XuFdT5kpw",
@@ -71,7 +85,6 @@
           appId: "1:374627600235:web:ec9d5da589a03d85a56e2e",
           measurementId: "G-PSDDZ36JNQ"
         };
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -87,6 +100,11 @@
         const roomsContainer = document.getElementById('rooms-container');
         const loadingMessage = document.getElementById('loading-message');
         const searchBar = document.getElementById('search-bar');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
         // --- Gestió d'Autenticació ---
         onAuthStateChanged(auth, user => {
@@ -149,7 +167,7 @@
                 roomElement.innerHTML = `
                     <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
                         <h2 class="text-2xl font-semibold text-gray-800">${room.name}</h2>
-                        <button onclick="deleteRoom('${room.id}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
+                        <button onclick="deleteRoom('${room.id}', '${room.name}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
                     </div>
                     ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
                     ${renderSection(room, 'referencia', 'Referències', referencies)}
@@ -177,6 +195,28 @@
         }
         
         // --- Lògica de Dades (CRUD) ---
+        
+        // Funció per mostrar el modal de confirmació
+        function showConfirmationModal(title, message, onConfirm) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            // Neteja listeners anteriors per evitar múltiples execucions
+            const newConfirmBtn = modalConfirmBtn.cloneNode(true);
+            modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
+            
+            newConfirmBtn.onclick = () => {
+                onConfirm();
+                confirmationModal.classList.add('hidden');
+            };
+            
+            modalCancelBtn.onclick = () => {
+                confirmationModal.classList.add('hidden');
+            };
+
+            confirmationModal.classList.remove('hidden');
+        }
+
         window.addRoom = async () => {
             const input = document.getElementById('new-room-name');
             if (input.value.trim()) {
@@ -185,17 +225,22 @@
             }
         };
 
-        window.deleteRoom = async (roomId) => {
-            if (!confirm('Segur que vols esborrar aquesta habitació i TOTES les seves idees i imatges?')) return;
-            const roomImagesRef = ref(storage, `images/${roomId}`);
-            const res = await listAll(roomImagesRef);
-            await Promise.all(res.items.map(r => deleteObject(r)));
-            const subcollections = ['ideas', 'images'];
-            for (const sc of subcollections) {
-                const snapshot = await getDocs(query(collection(db, `rooms/${roomId}/${sc}`)));
-                await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
-            }
-            await deleteDoc(doc(db, "rooms", roomId));
+        window.deleteRoom = (roomId, roomName) => {
+            showConfirmationModal(
+                `Esborrar "${roomName}"`,
+                'Segur que vols esborrar aquesta habitació i TOTES les seves idees i imatges? Aquesta acció no es pot desfer.',
+                async () => {
+                    const roomImagesRef = ref(storage, `images/${roomId}`);
+                    const res = await listAll(roomImagesRef);
+                    await Promise.all(res.items.map(r => deleteObject(r)));
+                    const subcollections = ['ideas', 'images'];
+                    for (const sc of subcollections) {
+                        const snapshot = await getDocs(query(collection(db, `rooms/${roomId}/${sc}`)));
+                        await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
+                    }
+                    await deleteDoc(doc(db, "rooms", roomId));
+                }
+            );
         };
 
         window.addIdea = async (roomId, section) => {
@@ -213,18 +258,20 @@
         window.deleteIdea = (roomId, ideaId) => deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
         
         window.editIdea = async (element, roomId, ideaId) => {
-            const ideaDoc = await getDocs(query(collection(db, `rooms/${roomId}/ideas`))).then(s => s.docs.find(d => d.id === ideaId));
-            if (!ideaDoc) return;
-            const ideaData = ideaDoc.data();
+            const ideaDocRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
+            const ideaSnapshot = await getDocs(query(collection(db, `rooms/${roomId}/ideas`))).then(s => s.docs.find(d => d.id === ideaId));
+            if (!ideaSnapshot) return;
+            const ideaData = ideaSnapshot.data();
+
             element.innerHTML = `<div class="p-2 border border-blue-500 rounded-lg"><input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2"><input type="text" value="${(ideaData.tags || []).join(', ')}" class="w-full p-1 rounded-md"><div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div></div>`;
             const textInput = element.querySelector('input[type="text"]:first-child');
             const tagsInput = element.querySelector('input[type="text"]:last-child');
             element.querySelector('.save-btn').onclick = async () => {
                 const newText = textInput.value.trim();
                 const newTags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
-                if (newText) await updateDoc(doc(db, `rooms/${roomId}/ideas`, ideaId), { text: newText, tags: newTags });
+                if (newText) await updateDoc(ideaDocRef, { text: newText, tags: newTags });
             };
-            element.querySelector('.cancel-btn').onclick = () => loadData(); // Recarrega per restaurar
+            element.querySelector('.cancel-btn').onclick = () => loadData();
         };
 
         window.uploadImage = async (event, roomId) => {
@@ -246,11 +293,15 @@
             }
         };
 
-        window.deleteImage = async (roomId, imageId, imagePath) => {
-            if (confirm('Segur que vols esborrar aquesta imatge?')) {
-                await deleteObject(ref(storage, imagePath));
-                await deleteDoc(doc(db, `rooms/${roomId}/images`, imageId));
-            }
+        window.deleteImage = (roomId, imageId, imagePath) => {
+            showConfirmationModal(
+                'Esborrar imatge',
+                'Segur que vols esborrar aquesta imatge?',
+                async () => {
+                    await deleteObject(ref(storage, imagePath));
+                    await deleteDoc(doc(db, `rooms/${roomId}/images`, imageId));
+                }
+            );
         };
 
         // --- Lògica de Cerca ---
