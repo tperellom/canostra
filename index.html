@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llista d'Idees per a la Casa</title>
+    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -106,6 +106,8 @@
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
+        let unsubscribeFromRooms = null; // Variable per guardar la funció de desconnexió
+
         // --- Gestió d'Autenticació ---
         onAuthStateChanged(auth, user => {
             if (user) {
@@ -116,6 +118,10 @@
             } else {
                 loginContainer.style.display = 'flex';
                 appContainer.style.display = 'none';
+                // Si l'usuari tanca sessió, desconnectem el listener per netejar
+                if (unsubscribeFromRooms) {
+                    unsubscribeFromRooms();
+                }
             }
         });
 
@@ -134,12 +140,19 @@
 
         // --- Càrrega i Renderitzat de Dades ---
         function loadData() {
-            onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), async (snapshot) => {
+            // Si ja hi ha un listener actiu, el desconnectem primer
+            if (unsubscribeFromRooms) {
+                unsubscribeFromRooms();
+            }
+
+            // Creem el nou listener i guardem la seva funció de "desconnexió"
+            unsubscribeFromRooms = onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), async (snapshot) => {
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
                     const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [], images: [] };
                     const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
                     const imagesQuery = query(collection(db, `rooms/${room.id}/images`), orderBy("createdAt", "asc"));
+                    
                     const [ideasSnapshot, imagesSnapshot] = await Promise.all([getDocs(ideasQuery), getDocs(imagesQuery)]);
                     room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     room.images = imagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -151,6 +164,7 @@
                 renderRooms(roomsData);
             });
         }
+
 
         function renderRooms(rooms) {
             roomsContainer.innerHTML = '';
