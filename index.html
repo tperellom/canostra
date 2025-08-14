@@ -384,12 +384,36 @@
             }
         };
 
-        window.deleteIdea = (roomId, ideaId) => {
+       window.deleteIdea = (roomId, ideaId) => {
             showConfirmationModal(
                 'Esborrar idea',
                 'Segur que vols esborrar aquesta idea?',
                 async () => {
+                    // 1. Esborrem el document de la base de dades
                     await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+
+                    // 2. Trobem l'element <li> corresponent a la pàgina usant el seu 'data-id'
+                    const elementToDelete = document.querySelector(`li.list-item[data-id='${ideaId}']`);
+                    
+                    if (elementToDelete) {
+                        const listElement = elementToDelete.parentElement; // Guardem una referència a la llista <ul> pare
+                        
+                        // 3. Eliminem l'element de la pàgina per a un efecte visual instantani
+                        elementToDelete.remove();
+
+                        // 4. (Extra) Actualitzem l'ordre dels elements restants per mantenir la consistència
+                        if (listElement) {
+                            const batch = writeBatch(db);
+                            Array.from(listElement.children).forEach((item, index) => {
+                                const id = item.dataset.id;
+                                if (id) {
+                                    const ideaRef = doc(db, `rooms/${roomId}/ideas`, id);
+                                    batch.update(ideaRef, { order: index });
+                                }
+                            });
+                            await batch.commit(); // Enviem tots els canvis d'ordre de cop
+                        }
+                    }
                 }
             );
         };
