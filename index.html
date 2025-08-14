@@ -11,10 +11,9 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .list-item:hover .action-buttons, .image-item:hover .action-buttons { opacity: 1; }
+        .list-item:hover .action-buttons { opacity: 1; }
         .action-buttons { opacity: 0; transition: opacity 0.2s ease-in-out; }
         .tag { background-color: #e0e7ff; color: #4338ca; }
-        .highlight { background-color: #fef9c3; }
         #confirmation-modal { transition: opacity 0.3s ease; }
     </style>
 </head>
@@ -88,12 +87,12 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        
+        // Hem eliminat les importacions de 'firebase/storage'
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
         const loginContainer = document.getElementById('login-container');
         const appContainer = document.getElementById('app-container');
@@ -106,7 +105,7 @@
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-        let unsubscribeFromRooms = null; // Variable per guardar la funció de desconnexió
+        let unsubscribeFromRooms = null; 
 
         // --- Gestió d'Autenticació ---
         onAuthStateChanged(auth, user => {
@@ -118,9 +117,9 @@
             } else {
                 loginContainer.style.display = 'flex';
                 appContainer.style.display = 'none';
-                // Si l'usuari tanca sessió, desconnectem el listener per netejar
                 if (unsubscribeFromRooms) {
                     unsubscribeFromRooms();
+                    unsubscribeFromRooms = null;
                 }
             }
         });
@@ -140,22 +139,18 @@
 
         // --- Càrrega i Renderitzat de Dades ---
         function loadData() {
-            // Si ja hi ha un listener actiu, el desconnectem primer
             if (unsubscribeFromRooms) {
                 unsubscribeFromRooms();
             }
 
-            // Creem el nou listener i guardem la seva funció de "desconnexió"
             unsubscribeFromRooms = onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), async (snapshot) => {
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
-                    const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [], images: [] };
+                    const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] }; // Eliminat 'images'
                     const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
-                    const imagesQuery = query(collection(db, `rooms/${room.id}/images`), orderBy("createdAt", "asc"));
                     
-                    const [ideasSnapshot, imagesSnapshot] = await Promise.all([getDocs(ideasQuery), getDocs(imagesQuery)]);
+                    const ideasSnapshot = await getDocs(ideasQuery);
                     room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    room.images = imagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     roomsData.push(room);
                 });
 
@@ -193,8 +188,7 @@
                     ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
                     ${renderSection(room, 'referencia', 'Referències', referencies)}
                     ${renderSection(room, 'opcional', 'Opcionals', opcionals)}
-                    ${renderImageSection(room)}
-                `;
+                `; // Eliminada la crida a renderImageSection
                 roomsContainer.appendChild(roomElement);
             });
         }
@@ -222,23 +216,25 @@
             
             return `<li class="list-item"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
         }
-
-        function renderImageSection(room) {
-            return `<div class="mt-8 border-t border-gray-100 pt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">Imatges</h3><div class="grid grid-cols-2 sm:grid-cols-3 gap-4">${room.images.map(img => `<div class="image-item relative group"><img src="${img.url}" class="w-full h-32 object-cover rounded-lg shadow-md"><div class="action-buttons absolute top-1 right-1"><button onclick="deleteImage('${room.id}', '${img.id}', '${img.path}')" class="bg-black bg-opacity-50 text-white rounded-full p-1.5"><i class="ph-bold ph-trash"></i></button></div></div>`).join('')}</div><div class="mt-4"><label for="image-upload-${room.id}" class="cursor-pointer bg-green-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-600 transition inline-flex items-center gap-2"><i class="ph ph-upload-simple"></i>Pujar Imatge</label><input type="file" id="image-upload-${room.id}" class="hidden" accept="image/*" onchange="uploadImage(event, '${room.id}')"><p id="upload-progress-${room.id}" class="text-sm text-gray-500 mt-2"></p></div></div>`;
-        }
         
         // --- Lògica de Dades (CRUD) ---
         
         function showConfirmationModal(title, message, onConfirm) {
             modalTitle.textContent = title;
             modalMessage.textContent = message;
+            
             const newConfirmBtn = modalConfirmBtn.cloneNode(true);
             modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
+            
             newConfirmBtn.onclick = () => {
                 onConfirm();
                 confirmationModal.classList.add('hidden');
             };
-            modalCancelBtn.onclick = () => confirmationModal.classList.add('hidden');
+            
+            modalCancelBtn.onclick = () => {
+                confirmationModal.classList.add('hidden');
+            };
+
             confirmationModal.classList.remove('hidden');
         }
 
@@ -257,12 +253,10 @@
         window.deleteRoom = (roomId, roomName) => {
             showConfirmationModal(
                 `Esborrar "${roomName}"`,
-                'Segur que vols esborrar aquesta habitació i TOTES les seves idees i imatges? Aquesta acció no es pot desfer.',
+                'Segur que vols esborrar aquesta habitació i TOTES les seves idees? Aquesta acció no es pot desfer.',
                 async () => {
-                    const roomImagesRef = ref(storage, `images/${roomId}`);
-                    const res = await listAll(roomImagesRef);
-                    await Promise.all(res.items.map(r => deleteObject(r)));
-                    const subcollections = ['ideas', 'images'];
+                    // Ja no necessitem esborrar imatges de Storage
+                    const subcollections = ['ideas'];
                     for (const sc of subcollections) {
                         const snapshot = await getDocs(query(collection(db, `rooms/${roomId}/${sc}`)));
                         await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
@@ -332,33 +326,7 @@
             tagsSection.querySelector('.cancel-tags-btn').onclick = () => loadData();
         };
 
-        window.uploadImage = async (event, roomId) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const progressText = document.getElementById(`upload-progress-${roomId}`);
-            progressText.textContent = 'Pujant...';
-            const storageRef = ref(storage, `images/${roomId}/${Date.now()}_${file.name}`);
-            try {
-                const snapshot = await uploadBytes(storageRef, file);
-                const url = await getDownloadURL(snapshot.ref);
-                await addDoc(collection(db, `rooms/${roomId}/images`), { url, path: snapshot.ref.fullPath, createdAt: new Date() });
-            } catch (error) {
-                console.error("Error:", error);
-                progressText.textContent = 'Error en pujar.';
-            } finally {
-                progressText.textContent = '';
-                event.target.value = '';
-            }
-        };
-
-        window.deleteImage = (roomId, imageId, imagePath) => {
-            showConfirmationModal('Esborrar imatge', 'Segur que vols esborrar aquesta imatge?',
-                async () => {
-                    await deleteObject(ref(storage, imagePath));
-                    await deleteDoc(doc(db, `rooms/${roomId}/images`, imageId));
-                }
-            );
-        };
+        // Les funcions 'uploadImage' i 'deleteImage' han estat eliminades.
 
         // --- Lògica de Cerca ---
         searchBar.addEventListener('input', (e) => {
