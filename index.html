@@ -190,9 +190,11 @@
                 roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
                 roomElement.dataset.roomTags = (room.tags || []).join(',');
 
+                // Filtrem les idees per a cada secció, incloent la nova
                 const necessitats = room.ideas.filter(i => i.section === 'necessitat').sort((a, b) => a.order - b.order);
-                const referencies = room.ideas.filter(i => i.section === 'referencia').sort((a, b) => a.order - b.order);
+                const tasquesPendents = room.ideas.filter(i => i.section === 'tasca-pendent').sort((a, b) => a.order - b.order);
                 const opcionals = room.ideas.filter(i => i.section === 'opcional').sort((a, b) => a.order - b.order);
+                const referencies = room.ideas.filter(i => i.section === 'referencia').sort((a, b) => a.order - b.order);
 
                 roomElement.innerHTML = `
                     <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
@@ -201,6 +203,7 @@
                     </div>
 
                     ${renderSection(room, 'necessitat', 'Necessitat principal', 'Indica les necessitats principals', necessitats, true)}
+                    ${renderSection(room, 'tasca-pendent', 'Tasques pendents', 'Nova tasca pendent...', tasquesPendents)}
                     ${renderSection(room, 'opcional', 'Opcionals', 'Nova idea opcional', opcionals)}
                     ${renderSection(room, 'referencia', 'Referències', 'Nova referència', referencies)}
                     
