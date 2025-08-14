@@ -9,12 +9,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Llibreria per arrossegar i reordenar -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .list-item:hover .action-buttons { opacity: 1; }
         .action-buttons { opacity: 0; transition: opacity 0.2s ease-in-out; }
         .tag { background-color: #e0e7ff; color: #4338ca; }
         #confirmation-modal { transition: opacity 0.3s ease; }
+        
+        /* Estil per a l'element que s'està arrossegant */
+        .sortable-ghost {
+            background-color: #e0e7ff;
+            opacity: 0.5;
+        }
+        .list-item {
+            cursor: grab;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -86,7 +97,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -145,7 +156,8 @@
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
                     const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
-                    const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
+                    // Ara ordenem per la nova propietat 'order'
+                    const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("order", "asc"));
                     
                     const ideasSnapshot = await getDocs(ideasQuery);
                     room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -174,7 +186,7 @@
                 const opcionals = room.ideas.filter(i => i.section === 'opcional');
 
                 roomElement.innerHTML = `
-                    <div class="flex justify-between items-center pb-3 mb-5">
+                    <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
                         <h2 class="text-2xl font-semibold text-gray-800">${room.name}</h2>
                         <button onclick="deleteRoom('${room.id}', '${room.name}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
                     </div>
@@ -189,6 +201,9 @@
                 `;
                 roomsContainer.appendChild(roomElement);
             });
+            
+            // Un cop renderitzades les habitacions, inicialitzem SortableJS
+            initializeSortable();
         }
         
         function renderRoomTags(room) {
@@ -219,7 +234,7 @@
                     <button onclick="addIdea('${room.id}', '${sectionId}')" class="mt-2 bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button>
                 `;
 
-            return `<div class="section-container mt-8 pt-6 ${borderClass}"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-disc pl-5">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4">${inputFieldsHTML}</div></div>`;
+            return `<div class="section-container mt-8 pt-6 ${borderClass}"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul id="idea-list-${room.id}-${sectionId}" class="sortable-list space-y-2 list-disc pl-5" data-room-id="${room.id}" data-section-id="${sectionId}">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4">${inputFieldsHTML}</div></div>`;
         }
 
         function renderIdea(idea, roomId) {
@@ -228,7 +243,7 @@
                 ? `<a href="${idea.link}" target="_blank" class="text-blue-600 hover:underline break-all">${idea.text}</a>` 
                 : `<span class="break-words">${idea.text}</span>`;
             
-            return `<li class="list-item"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
+            return `<li class="list-item" data-id="${idea.id}"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
         }
         
         // --- Lògica de Dades (CRUD) ---
@@ -283,17 +298,24 @@
             const textInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
             const text = textInput.value.trim();
             
+            const ideasQuery = query(collection(db, `rooms/${roomId}/ideas`), where("section", "==", section));
+            const ideasSnapshot = await getDocs(ideasQuery);
+            const newOrder = ideasSnapshot.size;
+
+            let data = { text, section, order: newOrder, createdAt: new Date() };
+
             if (section === 'referencia') {
                 const linkInput = document.getElementById(`new-idea-link-${roomId}-${section}`);
                 const link = linkInput.value.trim();
                 if (text && link) {
-                    await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, link, section, createdAt: new Date() });
+                    data.link = link;
+                    await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
                     textInput.value = '';
                     linkInput.value = '';
                 }
             } else {
                 if (text) {
-                    await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, createdAt: new Date() });
+                    await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
                     textInput.value = '';
                 }
             }
@@ -380,6 +402,29 @@
             };
             tagsSection.querySelector('.cancel-tags-btn').onclick = () => loadData();
         };
+
+        // --- Lògica de Reordenació ---
+        function initializeSortable() {
+            document.querySelectorAll('.sortable-list').forEach(list => {
+                new Sortable(list, {
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: async (evt) => {
+                        const listElement = evt.from;
+                        const roomId = listElement.dataset.roomId;
+                        
+                        const batch = writeBatch(db);
+                        Array.from(listElement.children).forEach((item, index) => {
+                            const ideaId = item.dataset.id;
+                            const ideaRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
+                            batch.update(ideaRef, { order: index });
+                        });
+                        await batch.commit();
+                        // No cal 'loadData()', onSnapshot ho detectarà
+                    }
+                });
+            });
+        }
 
         // --- Lògica de Cerca ---
         searchBar.addEventListener('input', (e) => {
