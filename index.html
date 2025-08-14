@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
+    <!-- Incloem Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icones de Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Amaga els botons d'acció per defecte i els mostra al passar el ratolí sobre l'element de la llista */
+        .list-item:hover .action-buttons {
+            opacity: 1;
+        }
+        .action-buttons {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Contenidor principal -->
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+
+        <!-- Capçalera -->
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Idees per a la Casa</h1>
+            <p class="text-md sm:text-lg text-gray-600 mt-2">Una llista organitzada d'idees per a cada habitació.</p>
+        </header>
+
+        <!-- Formulari per afegir una nova habitació -->
+        <div class="mb-8 bg-white p-4 rounded-xl shadow-md">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="new-room-name" placeholder="Nom de la nova habitació (ex: Menjador)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="addRoom()" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-plus-circle text-xl"></i>
+                    <span>Afegir Habitació</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenidor per a les habitacions (es generarà amb JavaScript) -->
+        <main id="rooms-container" class="space-y-8">
+            <!-- Les seccions de les habitacions es carregaran aquí -->
+        </main>
+        
+        <!-- Missatge de càrrega -->
+        <div id="loading-message" class="text-center text-gray-500 mt-10">
+            Carregant dades...
+        </div>
+
+    </div>
+
+    <!-- Imports de Firebase -->
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyDjMJi26sdZIOt1c9b7JOl1i7XuFdT5kpw",
+          authDomain: "canostra-cb0bc.firebaseapp.com",
+          projectId: "canostra-cb0bc",
+          storageBucket: "canostra-cb0bc.firebasestorage.app",
+          messagingSenderId: "374627600235",
+          appId: "1:374627600235:web:ec9d5da589a03d85a56e2e",
+          measurementId: "G-PSDDZ36JNQ"
+        };
+
+        // Importa les funcions que necessitem del SDK de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Inicialitza Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const roomsContainer = document.getElementById('rooms-container');
+        const loadingMessage = document.getElementById('loading-message');
+
+        // --- Funcions per renderitzar (dibuixar) les dades ---
+
+        function renderRooms(rooms) {
+            roomsContainer.innerHTML = ''; // Neteja el contenidor abans de redibuixar
+            if (rooms.length === 0) {
+                loadingMessage.textContent = 'No hi ha cap habitació. Afegeix-ne una per començar!';
+                loadingMessage.style.display = 'block';
+            } else {
+                loadingMessage.style.display = 'none';
+            }
+
+            rooms.forEach(room => {
+                const roomElement = document.createElement('section');
+                roomElement.className = 'bg-white rounded-xl shadow-lg p-6 sm:p-8 transition hover:shadow-xl';
+
+                // Filtra les idees per secció
+                const necessitats = room.ideas.filter(idea => idea.section === 'necessitat');
+                const referencies = room.ideas.filter(idea => idea.section === 'referencia');
+                const opcionals = room.ideas.filter(idea => idea.section === 'opcional');
+
+                roomElement.innerHTML = `
+                    <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
+                        <h2 class="text-2xl font-semibold text-gray-800">${room.name}</h2>
+                        <button onclick="deleteRoom('${room.id}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full">
+                            <i class="ph-bold ph-trash text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Secció Necessitats -->
+                    <div class="mt-6">
+                        <h3 class="text-xl font-medium text-gray-700 mb-3">Necessitat principal</h3>
+                        <ul class="space-y-2 list-none pl-0">
+                            ${necessitats.map(idea => renderIdea(idea, room.id)).join('')}
+                        </ul>
+                        <div class="mt-4 flex gap-2">
+                            <input type="text" id="new-idea-text-${room.id}-necessitat" placeholder="Nova necessitat" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="addIdea('${room.id}', 'necessitat')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
+                                <i class="ph ph-plus"></i><span>Afegir</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Secció Referències -->
+                    <div class="mt-8">
+                        <h3 class="text-xl font-medium text-gray-700 mb-3">Referències</h3>
+                        <ul class="space-y-2 list-none pl-0">
+                            ${referencies.map(idea => renderIdea(idea, room.id)).join('')}
+                        </ul>
+                        <div class="mt-4 flex gap-2">
+                            <input type="text" id="new-idea-text-${room.id}-referencia" placeholder="Nou enllaç o referència" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="addIdea('${room.id}', 'referencia')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
+                                <i class="ph ph-plus"></i><span>Afegir</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Secció Opcionals -->
+                    <div class="mt-8">
+                        <h3 class="text-xl font-medium text-gray-700 mb-3">Opcionals</h3>
+                        <ul class="space-y-2 list-none pl-0">
+                            ${opcionals.map(idea => renderIdea(idea, room.id)).join('')}
+                        </ul>
+                        <div class="mt-4 flex gap-2">
+                            <input type="text" id="new-idea-text-${room.id}-opcional" placeholder="Nova idea opcional" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="addIdea('${room.id}', 'opcional')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
+                                <i class="ph ph-plus"></i><span>Afegir</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                roomsContainer.appendChild(roomElement);
+            });
+        }
+        
+        function renderIdea(idea, roomId) {
+            const isLink = idea.text.startsWith('http://') || idea.text.startsWith('https://');
+            const content = isLink 
+                ? `<a href="${idea.text}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline break-all">${idea.text}</a>` 
+                : `<span class="break-words">${idea.text}</span>`;
+
+            return `
+                <li class="list-item flex items-center justify-between group p-2 rounded-md hover:bg-gray-50">
+                    <div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div>
+                    <div class="action-buttons flex items-center gap-2 ml-4">
+                        <button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 transition p-1 rounded-full"><i class="ph ph-pencil-simple"></i></button>
+                        <button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 transition p-1 rounded-full"><i class="ph ph-trash"></i></button>
+                    </div>
+                </li>
+            `;
+        }
+
+        // --- Lògica de la base de dades (Firestore) ---
+
+        onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), (snapshot) => {
+            const roomsData = [];
+            const promises = snapshot.docs.map(roomDoc => {
+                const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
+                const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
+                
+                return getDocs(ideasQuery).then(ideasSnapshot => {
+                    room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    roomsData.push(room);
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                 // Ordena les habitacions per data de creació abans de renderitzar
+                 roomsData.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+                 renderRooms(roomsData);
+            });
+        });
+
+        window.addRoom = async function() {
+            const newRoomNameInput = document.getElementById('new-room-name');
+            const roomName = newRoomNameInput.value.trim();
+            if (roomName) {
+                await addDoc(collection(db, "rooms"), {
+                    name: roomName,
+                    createdAt: new Date()
+                });
+                newRoomNameInput.value = '';
+            }
+        }
+
+        window.deleteRoom = async function(roomId) {
+            if (confirm('Segur que vols esborrar aquesta habitació i totes les seves idees?')) {
+                const ideasQuery = query(collection(db, `rooms/${roomId}/ideas`));
+                const ideasSnapshot = await getDocs(ideasQuery);
+                const deletePromises = ideasSnapshot.docs.map(doc => deleteDoc(doc.ref));
+                await Promise.all(deletePromises);
+                await deleteDoc(doc(db, "rooms", roomId));
+            }
+        }
+
+        window.addIdea = async function(roomId, section) {
+            const newIdeaTextInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
+            const ideaText = newIdeaTextInput.value.trim();
+            if (ideaText) {
+                await addDoc(collection(db, `rooms/${roomId}/ideas`), {
+                    text: ideaText,
+                    section: section,
+                    createdAt: new Date()
+                });
+                newIdeaTextInput.value = '';
+            }
+        }
+
+        window.deleteIdea = async function(roomId, ideaId) {
+            await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+        }
+        
+        window.editIdea = function(element, roomId, ideaId) {
+            const originalContent = element.innerHTML;
+            const currentText = element.textContent;
+            element.innerHTML = `<input type="text" value="${currentText}" class="w-full p-1 border border-blue-500 rounded-md">`;
+            const input = element.querySelector('input');
+            input.focus();
+            input.select();
+
+            const saveChanges = async () => {
+                const newText = input.value.trim();
+                if (newText && newText !== currentText) {
+                    const ideaRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
+                    await updateDoc(ideaRef, { text: newText });
+                } else {
+                    element.innerHTML = originalContent;
+                }
+                 // onSnapshot s'encarregarà de redibuixar l'element actualitzat
+            };
+            
+            input.addEventListener('blur', saveChanges);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') input.blur();
+                if (e.key === 'Escape') {
+                    element.innerHTML = originalContent;
+                    input.removeEventListener('blur', saveChanges);
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
