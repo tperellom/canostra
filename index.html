@@ -306,26 +306,52 @@
             const textInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
             const text = textInput.value.trim();
             
-            const ideasQuery = query(collection(db, `rooms/${roomId}/ideas`), where("section", "==", section));
-            const ideasSnapshot = await getDocs(ideasQuery);
-            const newOrder = ideasSnapshot.size;
+            // Trobem la llista corresponent a la secció per afegir el nou element
+            const listElement = document.getElementById(`idea-list-${roomId}-${section}`);
+            if (!listElement) {
+                console.error("No s'ha trobat la llista on afegir la idea.");
+                return;
+            }
+
+            // Calculem el nou ordre basant-nos en els elements que ja existeixen a la llista
+            const newOrder = listElement.children.length;
 
             let data = { text, section, order: newOrder, createdAt: new Date() };
+            let newDocRef = null; // Guardarem la referència del nou document aquí
 
+            // Lògica per afegir la idea (normal o referència)
             if (section === 'referencia') {
                 const linkInput = document.getElementById(`new-idea-link-${roomId}-${section}`);
                 const link = linkInput.value.trim();
                 if (text && link) {
                     data.link = link;
-                    await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
+                    // Desem la idea i guardem la seva referència
+                    newDocRef = await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
                     textInput.value = '';
                     linkInput.value = '';
                 }
             } else {
                 if (text) {
-                    await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
+                    // Desem la idea i guardem la seva referència
+                    newDocRef = await addDoc(collection(db, `rooms/${roomId}/ideas`), data);
                     textInput.value = '';
                 }
+            }
+
+            if (newDocRef) {
+                // 1. Creem l'objecte de la nova idea amb l'ID obtingut
+                const newIdea = { id: newDocRef.id, ...data };
+                
+                // 2. Usem la funció que ja tenies (renderIdea) per crear l'HTML del nou element <li>
+                const ideaHTML = renderIdea(newIdea, roomId);
+
+                // 3. Creem un element temporal per convertir el text HTML a un node del DOM
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = ideaHTML;
+                const newIdeaElement = tempDiv.firstChild;
+                
+                // 4. Finalment, afegim el nou element <li> al final de la llista <ul> correcta
+                listElement.appendChild(newIdeaElement);
             }
         };
 
