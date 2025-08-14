@@ -4,63 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Llista d'Idees per a la Casa (Dinàmica)</title>
-    <!-- Incloem Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Inter de Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Icones de Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Amaga els botons d'acció per defecte i els mostra al passar el ratolí sobre l'element de la llista */
-        .list-item:hover .action-buttons {
-            opacity: 1;
-        }
-        .action-buttons {
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .list-item:hover .action-buttons, .image-item:hover .action-buttons { opacity: 1; }
+        .action-buttons { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .tag { background-color: #e0e7ff; color: #4338ca; }
+        .highlight { background-color: #fef9c3; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <!-- Contenidor principal -->
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+    <!-- Pantalla de Login -->
+    <div id="login-container" class="min-h-screen flex items-center justify-center bg-gray-100">
+        <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Iniciar Sessió</h2>
+            <div class="space-y-4">
+                <input type="email" id="email" placeholder="Correu electrònic" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="password" placeholder="Contrasenya" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="login()" class="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition">Entrar</button>
+                <p id="login-error" class="text-red-500 text-sm text-center"></p>
+            </div>
+        </div>
+    </div>
 
-        <!-- Capçalera -->
-        <header class="text-center mb-10">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Idees per a la Casa</h1>
-            <p class="text-md sm:text-lg text-gray-600 mt-2">Una llista organitzada d'idees per a cada habitació.</p>
+    <!-- Contingut Principal de l'App (Ocult per defecte) -->
+    <div id="app-container" class="hidden container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        <header class="mb-10">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Idees per a la Casa</h1>
+                <div class="text-right">
+                    <p id="user-email" class="text-sm text-gray-600"></p>
+                    <button onclick="logout()" class="text-sm text-blue-600 hover:underline">Tancar sessió</button>
+                </div>
+            </div>
+            <div class="mt-6 relative">
+                 <input type="text" id="search-bar" placeholder="Cerca per etiqueta (ex: tag: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            </div>
         </header>
 
-        <!-- Formulari per afegir una nova habitació -->
         <div class="mb-8 bg-white p-4 rounded-xl shadow-md">
             <div class="flex flex-col sm:flex-row gap-4">
-                <input type="text" id="new-room-name" placeholder="Nom de la nova habitació (ex: Menjador)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="addRoom()" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center gap-2">
-                    <i class="ph-bold ph-plus-circle text-xl"></i>
-                    <span>Afegir Habitació</span>
+                <input type="text" id="new-room-name" placeholder="Nom de la nova habitació" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="addRoom()" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-plus-circle text-xl"></i><span>Afegir Habitació</span>
                 </button>
             </div>
         </div>
 
-        <!-- Contenidor per a les habitacions (es generarà amb JavaScript) -->
-        <main id="rooms-container" class="space-y-8">
-            <!-- Les seccions de les habitacions es carregaran aquí -->
-        </main>
-        
-        <!-- Missatge de càrrega -->
-        <div id="loading-message" class="text-center text-gray-500 mt-10">
-            Carregant dades...
-        </div>
-
+        <main id="rooms-container" class="space-y-8"></main>
+        <div id="loading-message" class="text-center text-gray-500 mt-10">Carregant dades...</div>
     </div>
 
-    <!-- Imports de Firebase -->
     <script type="module">
         const firebaseConfig = {
           apiKey: "AIzaSyDjMJi26sdZIOt1c9b7JOl1i7XuFdT5kpw",
@@ -72,197 +72,213 @@
           measurementId: "G-PSDDZ36JNQ"
         };
 
-        // Importa les funcions que necessitem del SDK de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // Inicialitza Firebase
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
+        const loginContainer = document.getElementById('login-container');
+        const appContainer = document.getElementById('app-container');
         const roomsContainer = document.getElementById('rooms-container');
         const loadingMessage = document.getElementById('loading-message');
+        const searchBar = document.getElementById('search-bar');
 
-        // --- Funcions per renderitzar (dibuixar) les dades ---
+        // --- Gestió d'Autenticació ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                loginContainer.style.display = 'none';
+                appContainer.style.display = 'block';
+                document.getElementById('user-email').textContent = user.email;
+                loadData();
+            } else {
+                loginContainer.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+        });
+
+        window.login = () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorP = document.getElementById('login-error');
+            errorP.textContent = '';
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => {
+                    errorP.textContent = 'Error: Correu o contrasenya incorrectes.';
+                });
+        };
+
+        window.logout = () => signOut(auth);
+
+        // --- Càrrega i Renderitzat de Dades ---
+        function loadData() {
+            onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), async (snapshot) => {
+                const roomsData = [];
+                const promises = snapshot.docs.map(async (roomDoc) => {
+                    const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [], images: [] };
+                    const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
+                    const imagesQuery = query(collection(db, `rooms/${room.id}/images`), orderBy("createdAt", "asc"));
+                    const [ideasSnapshot, imagesSnapshot] = await Promise.all([getDocs(ideasQuery), getDocs(imagesQuery)]);
+                    room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    room.images = imagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    roomsData.push(room);
+                });
+
+                await Promise.all(promises);
+                roomsData.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+                renderRooms(roomsData);
+            });
+        }
 
         function renderRooms(rooms) {
-            roomsContainer.innerHTML = ''; // Neteja el contenidor abans de redibuixar
-            if (rooms.length === 0) {
-                loadingMessage.textContent = 'No hi ha cap habitació. Afegeix-ne una per començar!';
-                loadingMessage.style.display = 'block';
-            } else {
-                loadingMessage.style.display = 'none';
-            }
+            roomsContainer.innerHTML = '';
+            loadingMessage.style.display = rooms.length === 0 ? 'block' : 'none';
+            if (rooms.length === 0) loadingMessage.textContent = 'No hi ha cap habitació. Afegeix-ne una per començar!';
 
             rooms.forEach(room => {
                 const roomElement = document.createElement('section');
-                roomElement.className = 'bg-white rounded-xl shadow-lg p-6 sm:p-8 transition hover:shadow-xl';
-
-                // Filtra les idees per secció
-                const necessitats = room.ideas.filter(idea => idea.section === 'necessitat');
-                const referencies = room.ideas.filter(idea => idea.section === 'referencia');
-                const opcionals = room.ideas.filter(idea => idea.section === 'opcional');
+                roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
+                const necessitats = room.ideas.filter(i => i.section === 'necessitat');
+                const referencies = room.ideas.filter(i => i.section === 'referencia');
+                const opcionals = room.ideas.filter(i => i.section === 'opcional');
 
                 roomElement.innerHTML = `
                     <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
                         <h2 class="text-2xl font-semibold text-gray-800">${room.name}</h2>
-                        <button onclick="deleteRoom('${room.id}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full">
-                            <i class="ph-bold ph-trash text-2xl"></i>
-                        </button>
+                        <button onclick="deleteRoom('${room.id}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
                     </div>
-                    
-                    <!-- Secció Necessitats -->
-                    <div class="mt-6">
-                        <h3 class="text-xl font-medium text-gray-700 mb-3">Necessitat principal</h3>
-                        <ul class="space-y-2 list-none pl-0">
-                            ${necessitats.map(idea => renderIdea(idea, room.id)).join('')}
-                        </ul>
-                        <div class="mt-4 flex gap-2">
-                            <input type="text" id="new-idea-text-${room.id}-necessitat" placeholder="Nova necessitat" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <button onclick="addIdea('${room.id}', 'necessitat')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
-                                <i class="ph ph-plus"></i><span>Afegir</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Secció Referències -->
-                    <div class="mt-8">
-                        <h3 class="text-xl font-medium text-gray-700 mb-3">Referències</h3>
-                        <ul class="space-y-2 list-none pl-0">
-                            ${referencies.map(idea => renderIdea(idea, room.id)).join('')}
-                        </ul>
-                        <div class="mt-4 flex gap-2">
-                            <input type="text" id="new-idea-text-${room.id}-referencia" placeholder="Nou enllaç o referència" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <button onclick="addIdea('${room.id}', 'referencia')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
-                                <i class="ph ph-plus"></i><span>Afegir</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Secció Opcionals -->
-                    <div class="mt-8">
-                        <h3 class="text-xl font-medium text-gray-700 mb-3">Opcionals</h3>
-                        <ul class="space-y-2 list-none pl-0">
-                            ${opcionals.map(idea => renderIdea(idea, room.id)).join('')}
-                        </ul>
-                        <div class="mt-4 flex gap-2">
-                            <input type="text" id="new-idea-text-${room.id}-opcional" placeholder="Nova idea opcional" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <button onclick="addIdea('${room.id}', 'opcional')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center gap-2">
-                                <i class="ph ph-plus"></i><span>Afegir</span>
-                            </button>
-                        </div>
-                    </div>
+                    ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
+                    ${renderSection(room, 'referencia', 'Referències', referencies)}
+                    ${renderSection(room, 'opcional', 'Opcionals', opcionals)}
+                    ${renderImageSection(room)}
                 `;
                 roomsContainer.appendChild(roomElement);
             });
         }
-        
-        function renderIdea(idea, roomId) {
-            const isLink = idea.text.startsWith('http://') || idea.text.startsWith('https://');
-            const content = isLink 
-                ? `<a href="${idea.text}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline break-all">${idea.text}</a>` 
-                : `<span class="break-words">${idea.text}</span>`;
 
-            return `
-                <li class="list-item flex items-center justify-between group p-2 rounded-md hover:bg-gray-50">
-                    <div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div>
-                    <div class="action-buttons flex items-center gap-2 ml-4">
-                        <button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 transition p-1 rounded-full"><i class="ph ph-pencil-simple"></i></button>
-                        <button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 transition p-1 rounded-full"><i class="ph ph-trash"></i></button>
-                    </div>
-                </li>
-            `;
+        function renderSection(room, sectionId, title, ideas) {
+            return `<div class="mt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-none pl-0">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4 space-y-2"><input type="text" id="new-idea-text-${room.id}-${sectionId}" placeholder="Nova idea..." class="w-full p-2 border border-gray-300 rounded-lg"><input type="text" id="new-idea-tags-${room.id}-${sectionId}" placeholder="Etiquetes (ex: fusta, llum, ikea)" class="w-full p-2 border border-gray-300 rounded-lg"><button onclick="addIdea('${room.id}', '${sectionId}')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button></div></div>`;
         }
 
-        // --- Lògica de la base de dades (Firestore) ---
+        function renderIdea(idea, roomId) {
+            const tagsHTML = (idea.tags || []).map(tag => `<span class="tag text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full">${tag}</span>`).join('');
+            const isLink = idea.text.startsWith('http');
+            const content = isLink ? `<a href="${idea.text}" target="_blank" class="text-blue-600 hover:underline break-all">${idea.text}</a>` : `<span class="break-words">${idea.text}</span>`;
+            
+            return `<li class="list-item" data-tags="${(idea.tags || []).join(',')}"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')"><div>${content}</div><div class="mt-1">${tagsHTML}</div></div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
+        }
 
-        onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), (snapshot) => {
-            const roomsData = [];
-            const promises = snapshot.docs.map(roomDoc => {
-                const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
-                const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
-                
-                return getDocs(ideasQuery).then(ideasSnapshot => {
-                    room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    roomsData.push(room);
+        function renderImageSection(room) {
+            return `<div class="mt-8"><h3 class="text-xl font-medium text-gray-700 mb-3">Imatges</h3><div class="grid grid-cols-2 sm:grid-cols-3 gap-4">${room.images.map(img => `<div class="image-item relative group"><img src="${img.url}" class="w-full h-32 object-cover rounded-lg shadow-md"><div class="action-buttons absolute top-1 right-1"><button onclick="deleteImage('${room.id}', '${img.id}', '${img.path}')" class="bg-black bg-opacity-50 text-white rounded-full p-1.5"><i class="ph-bold ph-trash"></i></button></div></div>`).join('')}</div><div class="mt-4"><label for="image-upload-${room.id}" class="cursor-pointer bg-green-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-600 transition inline-flex items-center gap-2"><i class="ph ph-upload-simple"></i>Pujar Imatge</label><input type="file" id="image-upload-${room.id}" class="hidden" accept="image/*" onchange="uploadImage(event, '${room.id}')"><p id="upload-progress-${room.id}" class="text-sm text-gray-500 mt-2"></p></div></div>`;
+        }
+        
+        // --- Lògica de Dades (CRUD) ---
+        window.addRoom = async () => {
+            const input = document.getElementById('new-room-name');
+            if (input.value.trim()) {
+                await addDoc(collection(db, "rooms"), { name: input.value.trim(), createdAt: new Date() });
+                input.value = '';
+            }
+        };
+
+        window.deleteRoom = async (roomId) => {
+            if (!confirm('Segur que vols esborrar aquesta habitació i TOTES les seves idees i imatges?')) return;
+            const roomImagesRef = ref(storage, `images/${roomId}`);
+            const res = await listAll(roomImagesRef);
+            await Promise.all(res.items.map(r => deleteObject(r)));
+            const subcollections = ['ideas', 'images'];
+            for (const sc of subcollections) {
+                const snapshot = await getDocs(query(collection(db, `rooms/${roomId}/${sc}`)));
+                await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
+            }
+            await deleteDoc(doc(db, "rooms", roomId));
+        };
+
+        window.addIdea = async (roomId, section) => {
+            const textInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
+            const tagsInput = document.getElementById(`new-idea-tags-${roomId}-${section}`);
+            const text = textInput.value.trim();
+            if (text) {
+                const tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+                await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, tags, createdAt: new Date() });
+                textInput.value = '';
+                tagsInput.value = '';
+            }
+        };
+
+        window.deleteIdea = (roomId, ideaId) => deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+        
+        window.editIdea = async (element, roomId, ideaId) => {
+            const ideaDoc = await getDocs(query(collection(db, `rooms/${roomId}/ideas`))).then(s => s.docs.find(d => d.id === ideaId));
+            if (!ideaDoc) return;
+            const ideaData = ideaDoc.data();
+            element.innerHTML = `<div class="p-2 border border-blue-500 rounded-lg"><input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2"><input type="text" value="${(ideaData.tags || []).join(', ')}" class="w-full p-1 rounded-md"><div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div></div>`;
+            const textInput = element.querySelector('input[type="text"]:first-child');
+            const tagsInput = element.querySelector('input[type="text"]:last-child');
+            element.querySelector('.save-btn').onclick = async () => {
+                const newText = textInput.value.trim();
+                const newTags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+                if (newText) await updateDoc(doc(db, `rooms/${roomId}/ideas`, ideaId), { text: newText, tags: newTags });
+            };
+            element.querySelector('.cancel-btn').onclick = () => loadData(); // Recarrega per restaurar
+        };
+
+        window.uploadImage = async (event, roomId) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const progressText = document.getElementById(`upload-progress-${roomId}`);
+            progressText.textContent = 'Pujant...';
+            const storageRef = ref(storage, `images/${roomId}/${Date.now()}_${file.name}`);
+            try {
+                const snapshot = await uploadBytes(storageRef, file);
+                const url = await getDownloadURL(snapshot.ref);
+                await addDoc(collection(db, `rooms/${roomId}/images`), { url, path: snapshot.ref.fullPath, createdAt: new Date() });
+            } catch (error) {
+                console.error("Error:", error);
+                progressText.textContent = 'Error en pujar.';
+            } finally {
+                progressText.textContent = '';
+                event.target.value = '';
+            }
+        };
+
+        window.deleteImage = async (roomId, imageId, imagePath) => {
+            if (confirm('Segur que vols esborrar aquesta imatge?')) {
+                await deleteObject(ref(storage, imagePath));
+                await deleteDoc(doc(db, `rooms/${roomId}/images`, imageId));
+            }
+        };
+
+        // --- Lògica de Cerca ---
+        searchBar.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.room-section').forEach(room => {
+                let roomHasVisibleItems = false;
+                room.querySelectorAll('.list-item').forEach(item => {
+                    item.classList.remove('highlight');
+                    const tags = item.dataset.tags.toLowerCase();
+                    const text = item.textContent.toLowerCase();
+                    let isVisible = true;
+                    if (searchTerm.startsWith('tag:')) {
+                        const searchTag = searchTerm.replace('tag:', '').trim();
+                        if (searchTag && !tags.split(',').includes(searchTag)) {
+                            isVisible = false;
+                        } else if (searchTag) {
+                            item.classList.add('highlight');
+                        }
+                    } else if (searchTerm && !text.includes(searchTerm)) {
+                        isVisible = false;
+                    }
+                    item.style.display = isVisible ? 'block' : 'none';
+                    if (isVisible) roomHasVisibleItems = true;
                 });
-            });
-
-            Promise.all(promises).then(() => {
-                 // Ordena les habitacions per data de creació abans de renderitzar
-                 roomsData.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
-                 renderRooms(roomsData);
+                room.style.display = roomHasVisibleItems || !searchTerm ? 'block' : 'none';
             });
         });
-
-        window.addRoom = async function() {
-            const newRoomNameInput = document.getElementById('new-room-name');
-            const roomName = newRoomNameInput.value.trim();
-            if (roomName) {
-                await addDoc(collection(db, "rooms"), {
-                    name: roomName,
-                    createdAt: new Date()
-                });
-                newRoomNameInput.value = '';
-            }
-        }
-
-        window.deleteRoom = async function(roomId) {
-            if (confirm('Segur que vols esborrar aquesta habitació i totes les seves idees?')) {
-                const ideasQuery = query(collection(db, `rooms/${roomId}/ideas`));
-                const ideasSnapshot = await getDocs(ideasQuery);
-                const deletePromises = ideasSnapshot.docs.map(doc => deleteDoc(doc.ref));
-                await Promise.all(deletePromises);
-                await deleteDoc(doc(db, "rooms", roomId));
-            }
-        }
-
-        window.addIdea = async function(roomId, section) {
-            const newIdeaTextInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
-            const ideaText = newIdeaTextInput.value.trim();
-            if (ideaText) {
-                await addDoc(collection(db, `rooms/${roomId}/ideas`), {
-                    text: ideaText,
-                    section: section,
-                    createdAt: new Date()
-                });
-                newIdeaTextInput.value = '';
-            }
-        }
-
-        window.deleteIdea = async function(roomId, ideaId) {
-            await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
-        }
-        
-        window.editIdea = function(element, roomId, ideaId) {
-            const originalContent = element.innerHTML;
-            const currentText = element.textContent;
-            element.innerHTML = `<input type="text" value="${currentText}" class="w-full p-1 border border-blue-500 rounded-md">`;
-            const input = element.querySelector('input');
-            input.focus();
-            input.select();
-
-            const saveChanges = async () => {
-                const newText = input.value.trim();
-                if (newText && newText !== currentText) {
-                    const ideaRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
-                    await updateDoc(ideaRef, { text: newText });
-                } else {
-                    element.innerHTML = originalContent;
-                }
-                 // onSnapshot s'encarregarà de redibuixar l'element actualitzat
-            };
-            
-            input.addEventListener('blur', saveChanges);
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') input.blur();
-                if (e.key === 'Escape') {
-                    element.innerHTML = originalContent;
-                    input.removeEventListener('blur', saveChanges);
-                }
-            });
-        }
-
     </script>
 </body>
 </html>
