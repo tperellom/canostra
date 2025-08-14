@@ -383,6 +383,7 @@
                 if (Object.keys(updateData).length > 0) {
                     await updateDoc(ideaDocRef, updateData);
                 }
+                // onSnapshot s'encarregarà de refrescar la UI automàticament
             };
             element.querySelector('.cancel-btn').onclick = () => loadData();
         };
