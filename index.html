@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
+    <title>Llista d'Idees per a Ca Nostra</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,7 +43,7 @@
                 </div>
             </div>
             <div class="mt-6 relative">
-                 <input type="text" id="search-bar" placeholder="Cerca per text o etiqueta (ex: tag: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 <input type="text" id="search-bar" placeholder="Cerca per etiqueta (ex: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                  <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
         </header>
@@ -88,8 +88,6 @@
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Hem eliminat les importacions de 'firebase/storage'
-
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -146,7 +144,7 @@
             unsubscribeFromRooms = onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "asc")), async (snapshot) => {
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
-                    const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] }; // Eliminat 'images'
+                    const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
                     const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("createdAt", "asc"));
                     
                     const ideasSnapshot = await getDocs(ideasQuery);
@@ -188,7 +186,7 @@
                     ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
                     ${renderSection(room, 'referencia', 'Referències', referencies)}
                     ${renderSection(room, 'opcional', 'Opcionals', opcionals)}
-                `; // Eliminada la crida a renderImageSection
+                `;
                 roomsContainer.appendChild(roomElement);
             });
         }
@@ -255,7 +253,6 @@
                 `Esborrar "${roomName}"`,
                 'Segur que vols esborrar aquesta habitació i TOTES les seves idees? Aquesta acció no es pot desfer.',
                 async () => {
-                    // Ja no necessitem esborrar imatges de Storage
                     const subcollections = ['ideas'];
                     for (const sc of subcollections) {
                         const snapshot = await getDocs(query(collection(db, `rooms/${roomId}/${sc}`)));
@@ -326,26 +323,22 @@
             tagsSection.querySelector('.cancel-tags-btn').onclick = () => loadData();
         };
 
-        // Les funcions 'uploadImage' i 'deleteImage' han estat eliminades.
-
         // --- Lògica de Cerca ---
         searchBar.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
+            const searchTerm = e.target.value.toLowerCase().trim();
             document.querySelectorAll('.room-section').forEach(room => {
-                const roomTags = room.dataset.roomTags.toLowerCase();
-                const roomTextContent = room.textContent.toLowerCase();
-                let isVisible = true;
-
-                if (searchTerm.startsWith('tag:')) {
-                    const searchTag = searchTerm.replace('tag:', '').trim();
-                    if (searchTag && !roomTags.split(',').includes(searchTag)) {
-                        isVisible = false;
-                    }
-                } else if (searchTerm && !roomTextContent.includes(searchTerm)) {
-                    isVisible = false;
+                // Si la barra de cerca està buida, mostra totes les habitacions
+                if (!searchTerm) {
+                    room.style.display = 'block';
+                    return;
                 }
+
+                const roomTags = (room.dataset.roomTags || '').toLowerCase().split(',');
                 
-                room.style.display = isVisible ? 'block' : 'none';
+                // Comprova si alguna de les etiquetes de l'habitació inclou el terme de cerca
+                const hasMatchingTag = roomTags.some(tag => tag.includes(searchTerm));
+                
+                room.style.display = hasMatchingTag ? 'block' : 'none';
             });
         });
     </script>
