@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
+    <title>Llista d'Idees per a la Casa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,6 @@
         .action-buttons { opacity: 0; transition: opacity 0.2s ease-in-out; }
         .tag { background-color: #e0e7ff; color: #4338ca; }
         .highlight { background-color: #fef9c3; }
-        /* Estils per al modal de confirmació */
         #confirmation-modal { transition: opacity 0.3s ease; }
     </style>
 </head>
@@ -161,6 +160,9 @@
             rooms.forEach(room => {
                 const roomElement = document.createElement('section');
                 roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
+                // Afegim les etiquetes de l'habitació a un atribut de dades per a la cerca
+                roomElement.dataset.roomTags = (room.tags || []).join(',');
+
                 const necessitats = room.ideas.filter(i => i.section === 'necessitat');
                 const referencies = room.ideas.filter(i => i.section === 'referencia');
                 const opcionals = room.ideas.filter(i => i.section === 'opcional');
@@ -170,6 +172,12 @@
                         <h2 class="text-2xl font-semibold text-gray-800">${room.name}</h2>
                         <button onclick="deleteRoom('${room.id}', '${room.name}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
                     </div>
+                    
+                    <!-- NOVA Secció d'Etiquetes per a l'Habitació -->
+                    <div class="mt-4" id="tags-section-${room.id}">
+                        ${renderRoomTags(room)}
+                    </div>
+
                     ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
                     ${renderSection(room, 'referencia', 'Referències', referencies)}
                     ${renderSection(room, 'opcional', 'Opcionals', opcionals)}
@@ -178,50 +186,58 @@
                 roomsContainer.appendChild(roomElement);
             });
         }
+        
+        function renderRoomTags(room) {
+            const tagsHTML = (room.tags || []).map(tag => `<span class="tag text-sm font-medium mr-2 mb-2 inline-block px-3 py-1 rounded-full">${tag}</span>`).join('');
+            return `
+                <div class="flex items-center gap-4">
+                     <h3 class="text-xl font-medium text-gray-700">Etiquetes</h3>
+                     <button onclick="editRoomTags('${room.id}')" class="text-gray-400 hover:text-blue-500 transition p-1 rounded-full"><i class="ph ph-pencil-simple"></i></button>
+                </div>
+                <div class="mt-2 flex flex-wrap">
+                    ${tagsHTML || '<p class="text-sm text-gray-500">No hi ha etiquetes per a aquesta habitació.</p>'}
+                </div>
+            `;
+        }
 
         function renderSection(room, sectionId, title, ideas) {
-            return `<div class="mt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-none pl-0">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4 space-y-2"><input type="text" id="new-idea-text-${room.id}-${sectionId}" placeholder="Nova idea..." class="w-full p-2 border border-gray-300 rounded-lg"><input type="text" id="new-idea-tags-${room.id}-${sectionId}" placeholder="Etiquetes (ex: fusta, llum, ikea)" class="w-full p-2 border border-gray-300 rounded-lg"><button onclick="addIdea('${room.id}', '${sectionId}')" class="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button></div></div>`;
+            return `<div class="mt-8 border-t border-gray-100 pt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-none pl-0">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4"><input type="text" id="new-idea-text-${room.id}-${sectionId}" placeholder="Nova idea..." class="w-full p-2 border border-gray-300 rounded-lg"><button onclick="addIdea('${room.id}', '${sectionId}')" class="mt-2 bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button></div></div>`;
         }
 
         function renderIdea(idea, roomId) {
-            const tagsHTML = (idea.tags || []).map(tag => `<span class="tag text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full">${tag}</span>`).join('');
             const isLink = idea.text.startsWith('http');
             const content = isLink ? `<a href="${idea.text}" target="_blank" class="text-blue-600 hover:underline break-all">${idea.text}</a>` : `<span class="break-words">${idea.text}</span>`;
             
-            return `<li class="list-item" data-tags="${(idea.tags || []).join(',')}"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')"><div>${content}</div><div class="mt-1">${tagsHTML}</div></div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
+            return `<li class="list-item"><div class="flex items-center justify-between group p-2 rounded-md hover:bg-gray-50"><div class="flex-grow" ondblclick="editIdea(this, '${roomId}', '${idea.id}')">${content}</div><div class="action-buttons flex items-center gap-2 ml-4"><button onclick="editIdea(this.parentElement.previousElementSibling, '${roomId}', '${idea.id}')" class="text-gray-400 hover:text-blue-500 p-1"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteIdea('${roomId}', '${idea.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash"></i></button></div></div></li>`;
         }
 
         function renderImageSection(room) {
-            return `<div class="mt-8"><h3 class="text-xl font-medium text-gray-700 mb-3">Imatges</h3><div class="grid grid-cols-2 sm:grid-cols-3 gap-4">${room.images.map(img => `<div class="image-item relative group"><img src="${img.url}" class="w-full h-32 object-cover rounded-lg shadow-md"><div class="action-buttons absolute top-1 right-1"><button onclick="deleteImage('${room.id}', '${img.id}', '${img.path}')" class="bg-black bg-opacity-50 text-white rounded-full p-1.5"><i class="ph-bold ph-trash"></i></button></div></div>`).join('')}</div><div class="mt-4"><label for="image-upload-${room.id}" class="cursor-pointer bg-green-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-600 transition inline-flex items-center gap-2"><i class="ph ph-upload-simple"></i>Pujar Imatge</label><input type="file" id="image-upload-${room.id}" class="hidden" accept="image/*" onchange="uploadImage(event, '${room.id}')"><p id="upload-progress-${room.id}" class="text-sm text-gray-500 mt-2"></p></div></div>`;
+            return `<div class="mt-8 border-t border-gray-100 pt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">Imatges</h3><div class="grid grid-cols-2 sm:grid-cols-3 gap-4">${room.images.map(img => `<div class="image-item relative group"><img src="${img.url}" class="w-full h-32 object-cover rounded-lg shadow-md"><div class="action-buttons absolute top-1 right-1"><button onclick="deleteImage('${room.id}', '${img.id}', '${img.path}')" class="bg-black bg-opacity-50 text-white rounded-full p-1.5"><i class="ph-bold ph-trash"></i></button></div></div>`).join('')}</div><div class="mt-4"><label for="image-upload-${room.id}" class="cursor-pointer bg-green-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-600 transition inline-flex items-center gap-2"><i class="ph ph-upload-simple"></i>Pujar Imatge</label><input type="file" id="image-upload-${room.id}" class="hidden" accept="image/*" onchange="uploadImage(event, '${room.id}')"><p id="upload-progress-${room.id}" class="text-sm text-gray-500 mt-2"></p></div></div>`;
         }
         
         // --- Lògica de Dades (CRUD) ---
         
-        // Funció per mostrar el modal de confirmació
         function showConfirmationModal(title, message, onConfirm) {
             modalTitle.textContent = title;
             modalMessage.textContent = message;
-            
-            // Neteja listeners anteriors per evitar múltiples execucions
             const newConfirmBtn = modalConfirmBtn.cloneNode(true);
             modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
-            
             newConfirmBtn.onclick = () => {
                 onConfirm();
                 confirmationModal.classList.add('hidden');
             };
-            
-            modalCancelBtn.onclick = () => {
-                confirmationModal.classList.add('hidden');
-            };
-
+            modalCancelBtn.onclick = () => confirmationModal.classList.add('hidden');
             confirmationModal.classList.remove('hidden');
         }
 
         window.addRoom = async () => {
             const input = document.getElementById('new-room-name');
             if (input.value.trim()) {
-                await addDoc(collection(db, "rooms"), { name: input.value.trim(), createdAt: new Date() });
+                await addDoc(collection(db, "rooms"), { 
+                    name: input.value.trim(), 
+                    tags: [], // Inicialitza les etiquetes com un array buit
+                    createdAt: new Date() 
+                });
                 input.value = '';
             }
         };
@@ -246,13 +262,11 @@
 
         window.addIdea = async (roomId, section) => {
             const textInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
-            const tagsInput = document.getElementById(`new-idea-tags-${roomId}-${section}`);
             const text = textInput.value.trim();
             if (text) {
-                const tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
-                await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, tags, createdAt: new Date() });
+                // Ja no afegim etiquetes a les idees individuals
+                await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, createdAt: new Date() });
                 textInput.value = '';
-                tagsInput.value = '';
             }
         };
 
@@ -264,15 +278,39 @@
             if (!ideaSnapshot) return;
             const ideaData = ideaSnapshot.data();
 
-            element.innerHTML = `<div class="p-2 border border-blue-500 rounded-lg"><input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2"><input type="text" value="${(ideaData.tags || []).join(', ')}" class="w-full p-1 rounded-md"><div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div></div>`;
-            const textInput = element.querySelector('input[type="text"]:first-child');
-            const tagsInput = element.querySelector('input[type="text"]:last-child');
+            element.innerHTML = `<div class="p-2 border border-blue-500 rounded-lg"><input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2"><div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div></div>`;
+            const textInput = element.querySelector('input[type="text"]');
             element.querySelector('.save-btn').onclick = async () => {
                 const newText = textInput.value.trim();
-                const newTags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
-                if (newText) await updateDoc(ideaDocRef, { text: newText, tags: newTags });
+                if (newText) await updateDoc(ideaDocRef, { text: newText });
             };
             element.querySelector('.cancel-btn').onclick = () => loadData();
+        };
+
+        window.editRoomTags = async (roomId) => {
+            const tagsSection = document.getElementById(`tags-section-${roomId}`);
+            const roomDocRef = doc(db, "rooms", roomId);
+            const roomSnapshot = await getDocs(query(collection(db, "rooms"))).then(s => s.docs.find(d => d.id === roomId));
+            if (!roomSnapshot) return;
+            const currentTags = roomSnapshot.data().tags || [];
+
+            tagsSection.innerHTML = `
+                <div class="p-2 border border-blue-500 rounded-lg">
+                    <h3 class="text-xl font-medium text-gray-700 mb-2">Editar Etiquetes</h3>
+                    <input type="text" value="${currentTags.join(', ')}" class="w-full p-2 border border-gray-300 rounded-lg">
+                    <div class="mt-2">
+                        <button class="save-tags-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button>
+                        <button class="cancel-tags-btn text-sm ml-2">Cancel·lar</button>
+                    </div>
+                </div>
+            `;
+
+            tagsSection.querySelector('.save-tags-btn').onclick = async () => {
+                const input = tagsSection.querySelector('input');
+                const newTags = input.value.split(',').map(t => t.trim()).filter(Boolean);
+                await updateDoc(roomDocRef, { tags: newTags });
+            };
+            tagsSection.querySelector('.cancel-tags-btn').onclick = () => loadData();
         };
 
         window.uploadImage = async (event, roomId) => {
@@ -295,9 +333,7 @@
         };
 
         window.deleteImage = (roomId, imageId, imagePath) => {
-            showConfirmationModal(
-                'Esborrar imatge',
-                'Segur que vols esborrar aquesta imatge?',
+            showConfirmationModal('Esborrar imatge', 'Segur que vols esborrar aquesta imatge?',
                 async () => {
                     await deleteObject(ref(storage, imagePath));
                     await deleteDoc(doc(db, `rooms/${roomId}/images`, imageId));
@@ -309,26 +345,20 @@
         searchBar.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             document.querySelectorAll('.room-section').forEach(room => {
-                let roomHasVisibleItems = false;
-                room.querySelectorAll('.list-item').forEach(item => {
-                    item.classList.remove('highlight');
-                    const tags = item.dataset.tags.toLowerCase();
-                    const text = item.textContent.toLowerCase();
-                    let isVisible = true;
-                    if (searchTerm.startsWith('tag:')) {
-                        const searchTag = searchTerm.replace('tag:', '').trim();
-                        if (searchTag && !tags.split(',').includes(searchTag)) {
-                            isVisible = false;
-                        } else if (searchTag) {
-                            item.classList.add('highlight');
-                        }
-                    } else if (searchTerm && !text.includes(searchTerm)) {
+                const roomTags = room.dataset.roomTags.toLowerCase();
+                const roomTextContent = room.textContent.toLowerCase();
+                let isVisible = true;
+
+                if (searchTerm.startsWith('tag:')) {
+                    const searchTag = searchTerm.replace('tag:', '').trim();
+                    if (searchTag && !roomTags.split(',').includes(searchTag)) {
                         isVisible = false;
                     }
-                    item.style.display = isVisible ? 'block' : 'none';
-                    if (isVisible) roomHasVisibleItems = true;
-                });
-                room.style.display = roomHasVisibleItems || !searchTerm ? 'block' : 'none';
+                } else if (searchTerm && !roomTextContent.includes(searchTerm)) {
+                    isVisible = false;
+                }
+                
+                room.style.display = isVisible ? 'block' : 'none';
             });
         });
     </script>
