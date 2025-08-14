@@ -101,7 +101,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs, writeBatch, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs, getDoc, writeBatch, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -341,51 +341,77 @@
         
         window.editIdea = async (element, roomId, ideaId) => {
             const ideaDocRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
-            const ideaSnapshot = await getDocs(query(collection(db, `rooms/${roomId}/ideas`))).then(s => s.docs.find(d => d.id === ideaId));
-            if (!ideaSnapshot) return;
-            const ideaData = ideaSnapshot.data();
+            // És més eficient obtenir un sol document amb getDoc que consultar tota la col·lecció
+            const ideaSnap = await getDoc(ideaDocRef);
+
+            if (!ideaSnap.exists()) {
+                console.error("Error: No s'ha trobat la idea per editar.");
+                return;
+            }
+            const ideaData = ideaSnap.data();
+
+            // Guardem l'HTML original per si l'usuari cancel·la l'edició
+            const originalHTML = element.innerHTML;
 
             let editHTML;
             if (ideaData.section === 'referencia') {
                 editHTML = `
-                    <div class="p-2 border border-blue-500 rounded-lg">
-                        <input type="text" value="${ideaData.text}" placeholder="Text de l'enllaç" class="w-full p-1 rounded-md mb-2">
-                        <input type="url" value="${ideaData.link || ''}" placeholder="URL de l'enllaç" class="w-full p-1 rounded-md mb-2">
-                        <div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div>
+                    <div class="p-2 border border-blue-500 rounded-lg bg-white">
+                        <input type="text" value="${ideaData.text}" placeholder="Text de l'enllaç" class="w-full p-1 rounded-md mb-2 border border-gray-300">
+                        <input type="url" value="${ideaData.link || ''}" placeholder="URL de l'enllaç" class="w-full p-1 rounded-md mb-2 border border-gray-300">
+                        <div class="mt-2 flex items-center gap-2">
+                            <button class="save-btn bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-semibold hover:bg-blue-700">Desar</button>
+                            <button class="cancel-btn text-sm text-gray-600 hover:underline">Cancel·lar</button>
+                        </div>
                     </div>`;
             } else {
                 editHTML = `
-                    <div class="p-2 border border-blue-500 rounded-lg">
-                        <input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2">
-                        <div class="mt-2"><button class="save-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Desar</button> <button class="cancel-btn text-sm">Cancel·lar</button></div>
+                    <div class="p-2 border border-blue-500 rounded-lg bg-white">
+                        <input type="text" value="${ideaData.text}" class="w-full p-1 rounded-md mb-2 border border-gray-300">
+                        <div class="mt-2 flex items-center gap-2">
+                            <button class="save-btn bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-semibold hover:bg-blue-700">Desar</button>
+                            <button class="cancel-btn text-sm text-gray-600 hover:underline">Cancel·lar</button>
+                        </div>
                     </div>`;
             }
             element.innerHTML = editHTML;
+            element.querySelector('input[type="text"]').focus(); // Millora: posa el focus a l'input
 
+            // Lògica del botó "Desar"
             element.querySelector('.save-btn').onclick = async () => {
                 let updateData = {};
+                let newContentHTML = '';
+
                 if (ideaData.section === 'referencia') {
-                    const textInput = element.querySelector('input[type="text"]');
-                    const linkInput = element.querySelector('input[type="url"]');
-                    const newText = textInput.value.trim();
-                    const newLink = linkInput.value.trim();
+                    const newText = element.querySelector('input[type="text"]').value.trim();
+                    const newLink = element.querySelector('input[type="url"]').value.trim();
                     if (newText && newLink) {
                         updateData = { text: newText, link: newLink };
+                        newContentHTML = `<a href="${newLink}" target="_blank" class="text-blue-600 hover:underline break-all">${newText}</a>`;
                     }
                 } else {
-                    const textInput = element.querySelector('input[type="text"]');
-                    const newText = textInput.value.trim();
+                    const newText = element.querySelector('input[type="text"]').value.trim();
                     if (newText) {
                         updateData = { text: newText };
+                        newContentHTML = `<span class="break-words">${newText}</span>`;
                     }
                 }
                 
                 if (Object.keys(updateData).length > 0) {
                     await updateDoc(ideaDocRef, updateData);
+                    // ⭐ AQUEST ÉS EL CANVI CLAU: Actualitza la UI immediatament
+                    element.innerHTML = newContentHTML;
+                } else {
+                    // Si no hi ha dades vàlides (ex: text buit), restaura l'estat original
+                    element.innerHTML = originalHTML;
                 }
-                // onSnapshot s'encarregarà de refrescar la UI automàticament
             };
-            element.querySelector('.cancel-btn').onclick = () => loadData();
+
+            // Lògica del botó "Cancel·lar"
+            element.querySelector('.cancel-btn').onclick = () => {
+                // Restaura l'HTML original sense recarregar-ho tot
+                element.innerHTML = originalHTML;
+            };
         };
 
         window.editRoomTags = async (roomId) => {
