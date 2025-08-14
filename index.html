@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Llista d'Idees per a Ca Nostra</title>
+    <title>Llista d'Idees per a la Casa (Dinàmica)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -183,9 +183,9 @@
                         ${renderRoomTags(room)}
                     </div>
 
-                    ${renderSection(room, 'necessitat', 'Necessitat principal', necessitats)}
-                    ${renderSection(room, 'referencia', 'Referències', referencies)}
-                    ${renderSection(room, 'opcional', 'Opcionals', opcionals)}
+                    ${renderSection(room, 'necessitat', 'Necessitat principal', 'Indica les necessitats principals', necessitats)}
+                    ${renderSection(room, 'referencia', 'Referències', 'Nova referència', referencies)}
+                    ${renderSection(room, 'opcional', 'Opcionals', 'Nova idea opcional', opcionals)}
                 `;
                 roomsContainer.appendChild(roomElement);
             });
@@ -204,8 +204,8 @@
             `;
         }
 
-        function renderSection(room, sectionId, title, ideas) {
-            return `<div class="mt-8 border-t border-gray-100 pt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-none pl-0">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4"><input type="text" id="new-idea-text-${room.id}-${sectionId}" placeholder="Nova idea..." class="w-full p-2 border border-gray-300 rounded-lg"><button onclick="addIdea('${room.id}', '${sectionId}')" class="mt-2 bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button></div></div>`;
+        function renderSection(room, sectionId, title, placeholder, ideas) {
+            return `<div class="mt-8 border-t border-gray-100 pt-6"><h3 class="text-xl font-medium text-gray-700 mb-3">${title}</h3><ul class="space-y-2 list-none pl-0">${ideas.map(idea => renderIdea(idea, room.id)).join('')}</ul><div class="mt-4"><input type="text" id="new-idea-text-${room.id}-${sectionId}" placeholder="${placeholder}" class="w-full p-2 border border-gray-300 rounded-lg"><button onclick="addIdea('${room.id}', '${sectionId}')" class="mt-2 bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition">Afegir</button></div></div>`;
         }
 
         function renderIdea(idea, roomId) {
@@ -268,7 +268,10 @@
             const text = textInput.value.trim();
             if (text) {
                 await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, createdAt: new Date() });
-                textInput.value = '';
+                // No cal cridar a loadData() aquí, onSnapshot s'encarregarà de l'actualització
+                // Però com que el nostre onSnapshot principal només escolta la col·lecció 'rooms',
+                // i no les subcol·leccions 'ideas', hem de forçar la recàrrega.
+                loadData();
             }
         };
 
@@ -278,6 +281,7 @@
                 'Segur que vols esborrar aquesta idea?',
                 async () => {
                     await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+                    loadData(); // Forcem recàrrega per veure el canvi
                 }
             );
         };
@@ -292,7 +296,10 @@
             const textInput = element.querySelector('input[type="text"]');
             element.querySelector('.save-btn').onclick = async () => {
                 const newText = textInput.value.trim();
-                if (newText) await updateDoc(ideaDocRef, { text: newText });
+                if (newText) {
+                    await updateDoc(ideaDocRef, { text: newText });
+                    loadData(); // Forcem recàrrega per veure el canvi
+                }
             };
             element.querySelector('.cancel-btn').onclick = () => loadData();
         };
@@ -319,6 +326,7 @@
                 const input = tagsSection.querySelector('input');
                 const newTags = input.value.split(',').map(t => t.trim()).filter(Boolean);
                 await updateDoc(roomDocRef, { tags: newTags });
+                // No cal 'loadData()' aquí, el listener principal de 'rooms' detectarà el canvi a les etiquetes
             };
             tagsSection.querySelector('.cancel-tags-btn').onclick = () => loadData();
         };
@@ -327,15 +335,12 @@
         searchBar.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase().trim();
             document.querySelectorAll('.room-section').forEach(room => {
-                // Si la barra de cerca està buida, mostra totes les habitacions
                 if (!searchTerm) {
                     room.style.display = 'block';
                     return;
                 }
 
                 const roomTags = (room.dataset.roomTags || '').toLowerCase().split(',');
-                
-                // Comprova si alguna de les etiquetes de l'habitació inclou el terme de cerca
                 const hasMatchingTag = roomTags.some(tag => tag.includes(searchTerm));
                 
                 room.style.display = hasMatchingTag ? 'block' : 'none';
