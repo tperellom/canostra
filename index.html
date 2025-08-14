@@ -160,7 +160,6 @@
             rooms.forEach(room => {
                 const roomElement = document.createElement('section');
                 roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
-                // Afegim les etiquetes de l'habitació a un atribut de dades per a la cerca
                 roomElement.dataset.roomTags = (room.tags || []).join(',');
 
                 const necessitats = room.ideas.filter(i => i.section === 'necessitat');
@@ -173,7 +172,6 @@
                         <button onclick="deleteRoom('${room.id}', '${room.name}')" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full"><i class="ph-bold ph-trash text-2xl"></i></button>
                     </div>
                     
-                    <!-- NOVA Secció d'Etiquetes per a l'Habitació -->
                     <div class="mt-4" id="tags-section-${room.id}">
                         ${renderRoomTags(room)}
                     </div>
@@ -235,7 +233,7 @@
             if (input.value.trim()) {
                 await addDoc(collection(db, "rooms"), { 
                     name: input.value.trim(), 
-                    tags: [], // Inicialitza les etiquetes com un array buit
+                    tags: [],
                     createdAt: new Date() 
                 });
                 input.value = '';
@@ -264,13 +262,20 @@
             const textInput = document.getElementById(`new-idea-text-${roomId}-${section}`);
             const text = textInput.value.trim();
             if (text) {
-                // Ja no afegim etiquetes a les idees individuals
                 await addDoc(collection(db, `rooms/${roomId}/ideas`), { text, section, createdAt: new Date() });
                 textInput.value = '';
             }
         };
 
-        window.deleteIdea = (roomId, ideaId) => deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+        window.deleteIdea = (roomId, ideaId) => {
+            showConfirmationModal(
+                'Esborrar idea',
+                'Segur que vols esborrar aquesta idea?',
+                async () => {
+                    await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
+                }
+            );
+        };
         
         window.editIdea = async (element, roomId, ideaId) => {
             const ideaDocRef = doc(db, `rooms/${roomId}/ideas`, ideaId);
