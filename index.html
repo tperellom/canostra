@@ -97,7 +97,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, getDocs, writeBatch, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -156,8 +156,8 @@
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
                     const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
-                    // Ara ordenem per la nova propietat 'order'
-                    const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`), orderBy("order", "asc"));
+                    // CORRECCIÓ: No ordenem aquí, ho farem en JS per cada secció
+                    const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`));
                     
                     const ideasSnapshot = await getDocs(ideasQuery);
                     room.ideas = ideasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -181,9 +181,10 @@
                 roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
                 roomElement.dataset.roomTags = (room.tags || []).join(',');
 
-                const necessitats = room.ideas.filter(i => i.section === 'necessitat');
-                const referencies = room.ideas.filter(i => i.section === 'referencia');
-                const opcionals = room.ideas.filter(i => i.section === 'opcional');
+                // CORRECCIÓ: Filtrem i DESPRÉS ordenem cada secció individualment
+                const necessitats = room.ideas.filter(i => i.section === 'necessitat').sort((a, b) => a.order - b.order);
+                const referencies = room.ideas.filter(i => i.section === 'referencia').sort((a, b) => a.order - b.order);
+                const opcionals = room.ideas.filter(i => i.section === 'opcional').sort((a, b) => a.order - b.order);
 
                 roomElement.innerHTML = `
                     <div class="flex justify-between items-center border-b-2 border-gray-100 pb-3 mb-5">
@@ -202,7 +203,6 @@
                 roomsContainer.appendChild(roomElement);
             });
             
-            // Un cop renderitzades les habitacions, inicialitzem SortableJS
             initializeSortable();
         }
         
@@ -319,7 +319,7 @@
                     textInput.value = '';
                 }
             }
-            loadData(); 
+            // No cal cridar a loadData(), onSnapshot ho farà automàticament
         };
 
         window.deleteIdea = (roomId, ideaId) => {
@@ -328,7 +328,7 @@
                 'Segur que vols esborrar aquesta idea?',
                 async () => {
                     await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
-                    loadData(); 
+                    // No cal cridar a loadData(), onSnapshot ho farà automàticament
                 }
             );
         };
@@ -372,7 +372,6 @@
                         await updateDoc(ideaDocRef, { text: newText });
                     }
                 }
-                loadData();
             };
             element.querySelector('.cancel-btn').onclick = () => loadData();
         };
@@ -420,7 +419,6 @@
                             batch.update(ideaRef, { order: index });
                         });
                         await batch.commit();
-                        // No cal 'loadData()', onSnapshot ho detectarà
                     }
                 });
             });
