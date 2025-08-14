@@ -18,13 +18,17 @@
         .tag { background-color: #e0e7ff; color: #4338ca; }
         #confirmation-modal { transition: opacity 0.3s ease; }
         
-        /* Estil per a l'element que s'està arrossegant */
         .sortable-ghost {
             background-color: #e0e7ff;
             opacity: 0.5;
         }
         .list-item {
             cursor: grab;
+        }
+        .tag-filter.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
         }
     </style>
 </head>
@@ -53,9 +57,9 @@
                     <button onclick="logout()" class="text-sm text-blue-600 hover:underline">Tancar sessió</button>
                 </div>
             </div>
-            <div class="mt-6 relative">
-                 <input type="text" id="search-bar" placeholder="Cerca per etiqueta (ex: cuina)" class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                 <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <!-- Contenidor per als botons de filtre per etiqueta -->
+            <div id="tags-filter-container" class="mt-6 flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+                <!-- Els botons de les etiquetes es generaran aquí -->
             </div>
         </header>
 
@@ -107,7 +111,7 @@
         const appContainer = document.getElementById('app-container');
         const roomsContainer = document.getElementById('rooms-container');
         const loadingMessage = document.getElementById('loading-message');
-        const searchBar = document.getElementById('search-bar');
+        const tagsFilterContainer = document.getElementById('tags-filter-container');
         const confirmationModal = document.getElementById('confirmation-modal');
         const modalTitle = document.getElementById('modal-title');
         const modalMessage = document.getElementById('modal-message');
@@ -115,6 +119,7 @@
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
         let unsubscribeFromRooms = null; 
+        let activeFilters = new Set();
 
         // --- Gestió d'Autenticació ---
         onAuthStateChanged(auth, user => {
@@ -156,7 +161,6 @@
                 const roomsData = [];
                 const promises = snapshot.docs.map(async (roomDoc) => {
                     const room = { id: roomDoc.id, ...roomDoc.data(), ideas: [] };
-                    // CORRECCIÓ: No ordenem aquí, ho farem en JS per cada secció
                     const ideasQuery = query(collection(db, `rooms/${room.id}/ideas`));
                     
                     const ideasSnapshot = await getDocs(ideasQuery);
@@ -166,7 +170,12 @@
 
                 await Promise.all(promises);
                 roomsData.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+                
+                const allTags = [...new Set(roomsData.flatMap(room => room.tags || []))].sort();
+                renderTagFilters(allTags);
+                
                 renderRooms(roomsData);
+                applyFilters(); // Aplica els filtres actius després de renderitzar
             });
         }
 
@@ -181,7 +190,6 @@
                 roomElement.className = 'room-section bg-white rounded-xl shadow-lg p-6 sm:p-8';
                 roomElement.dataset.roomTags = (room.tags || []).join(',');
 
-                // CORRECCIÓ: Filtrem i DESPRÉS ordenem cada secció individualment
                 const necessitats = room.ideas.filter(i => i.section === 'necessitat').sort((a, b) => a.order - b.order);
                 const referencies = room.ideas.filter(i => i.section === 'referencia').sort((a, b) => a.order - b.order);
                 const opcionals = room.ideas.filter(i => i.section === 'opcional').sort((a, b) => a.order - b.order);
@@ -319,7 +327,6 @@
                     textInput.value = '';
                 }
             }
-            // No cal cridar a loadData(), onSnapshot ho farà automàticament
         };
 
         window.deleteIdea = (roomId, ideaId) => {
@@ -328,7 +335,6 @@
                 'Segur que vols esborrar aquesta idea?',
                 async () => {
                     await deleteDoc(doc(db, `rooms/${roomId}/ideas`, ideaId));
-                    // No cal cridar a loadData(), onSnapshot ho farà automàticament
                 }
             );
         };
@@ -357,20 +363,25 @@
             element.innerHTML = editHTML;
 
             element.querySelector('.save-btn').onclick = async () => {
+                let updateData = {};
                 if (ideaData.section === 'referencia') {
                     const textInput = element.querySelector('input[type="text"]');
                     const linkInput = element.querySelector('input[type="url"]');
                     const newText = textInput.value.trim();
                     const newLink = linkInput.value.trim();
                     if (newText && newLink) {
-                        await updateDoc(ideaDocRef, { text: newText, link: newLink });
+                        updateData = { text: newText, link: newLink };
                     }
                 } else {
                     const textInput = element.querySelector('input[type="text"]');
                     const newText = textInput.value.trim();
                     if (newText) {
-                        await updateDoc(ideaDocRef, { text: newText });
+                        updateData = { text: newText };
                     }
+                }
+                
+                if (Object.keys(updateData).length > 0) {
+                    await updateDoc(ideaDocRef, updateData);
                 }
             };
             element.querySelector('.cancel-btn').onclick = () => loadData();
@@ -424,21 +435,75 @@
             });
         }
 
-        // --- Lògica de Cerca ---
-        searchBar.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase().trim();
+        // --- Lògica de Filtre per Etiquetes ---
+        function renderTagFilters(tags) {
+            tagsFilterContainer.innerHTML = '';
+            
+            const allButton = document.createElement('button');
+            allButton.id = 'all-rooms-btn';
+            allButton.className = 'tag-filter px-3 py-1 border border-gray-300 text-gray-800 rounded-full text-sm font-medium';
+            allButton.textContent = 'Totes les habitacions';
+            allButton.onclick = () => resetFilters();
+            tagsFilterContainer.appendChild(allButton);
+
+            tags.forEach(tag => {
+                const tagButton = document.createElement('button');
+                tagButton.className = 'tag-filter px-3 py-1 border border-gray-300 text-gray-800 rounded-full text-sm font-medium';
+                tagButton.textContent = tag;
+                tagButton.dataset.tag = tag;
+                tagButton.onclick = () => toggleTagFilter(tag, tagButton);
+                tagsFilterContainer.appendChild(tagButton);
+            });
+
+            updateActiveFilterButtons();
+        }
+        
+        function resetFilters() {
+            activeFilters.clear();
+            applyFilters();
+        }
+
+        function toggleTagFilter(tag, clickedButton) {
+            if (activeFilters.has(tag)) {
+                activeFilters.delete(tag);
+            } else {
+                activeFilters.add(tag);
+            }
+            applyFilters();
+        }
+
+        function applyFilters() {
+            updateActiveFilterButtons();
             document.querySelectorAll('.room-section').forEach(room => {
-                if (!searchTerm) {
+                if (activeFilters.size === 0) {
                     room.style.display = 'block';
                     return;
                 }
 
-                const roomTags = (room.dataset.roomTags || '').toLowerCase().split(',');
-                const hasMatchingTag = roomTags.some(tag => tag.includes(searchTerm));
+                const roomTags = (room.dataset.roomTags || '').split(',');
+                const hasAllTags = [...activeFilters].every(filterTag => roomTags.includes(filterTag));
                 
-                room.style.display = hasMatchingTag ? 'block' : 'none';
+                room.style.display = hasAllTags ? 'block' : 'none';
             });
-        });
+        }
+
+        function updateActiveFilterButtons() {
+            document.querySelectorAll('.tag-filter').forEach(btn => {
+                const tag = btn.dataset.tag;
+                if (tag && activeFilters.has(tag)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            const allBtn = document.getElementById('all-rooms-btn');
+            if (activeFilters.size === 0) {
+                allBtn.classList.add('active');
+            } else {
+                allBtn.classList.remove('active');
+            }
+        }
     </script>
 </body>
 </html>
